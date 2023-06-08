@@ -13,6 +13,7 @@ STATUSES = {
     "authentication": ("Authentication credentials invalid", {
         "imap": "AUTHENTICATIONFAILED",
         "smtp": "535 5.7.8",
+        "submission": "535 5.7.8",
         "pop3": "-ERR Authentication failed",
         "sieve": "AuthFailed"
     }),
@@ -39,10 +40,19 @@ def check_credentials(user, password, ip, protocol=None, auth_port=None, source_
             return True
     if utils.is_app_token(password):
         for token in user.tokens:
-            if (token.check_password(password) and
-                (not token.ip or token.ip == ip)):
+            if token.check_password(password):
+                if not token.ip or utils.is_ip_in_subnet(ip, token.ip):
                     app.logger.info(f'Login attempt for: {user}/{protocol}/{auth_port} from: {ip}/{source_port}: success: token-{token.id}: {token.comment or ""!r}')
+                    if protocol in ['imap', 'pop3'] and token.rights.name == 'send_only':
+                        app.logger.info(f'Login attempt for: {user}/{protocol}/{auth_port} from: {ip}/{source_port}: failed: send-only: token-{token.id}: {token.comment or ""!r}')
+                        return False
+                    if protocol == 'submission' and token.rights.name == 'receive_only':
+                        app.logger.info(f'Login attempt for: {user}/{protocol}/{auth_port} from: {ip}/{source_port}: failed: receive-only: token-{token.id}: {token.comment or ""!r}')
+                        return False
                     return True
+                else:
+                    app.logger.info(f'Login attempt for: {user}/{protocol}/{auth_port} from: {ip}/{source_port}: failed: badip: token-{token.id}: {token.comment or ""!r}')
+                    return False # we can return directly here since the token is valid
     if user.check_password(password):
         app.logger.info(f'Login attempt for: {user}/{protocol}/{auth_port} from: {ip}/{source_port}: success: password')
         return True

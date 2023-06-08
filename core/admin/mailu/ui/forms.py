@@ -2,9 +2,12 @@ from wtforms import validators, fields, widgets
 from wtforms_components import fields as fields_
 from flask_babel import lazy_gettext as _
 
+from mailu import models
+
 import flask_login
 import flask_wtf
 import re
+import ipaddress
 
 LOCALPART_REGEX = "^[a-zA-Z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-zA-Z0-9!#$%&'*+/=?^_`{|}~-]+)*$"
 
@@ -152,10 +155,24 @@ class TokenForm(flask_wtf.FlaskForm):
     raw_password = fields.HiddenField([validators.DataRequired()])
     comment = fields.StringField(_('Comment'))
     ip = fields.StringField(
-        _('Authorized IP'), [validators.Optional(), validators.IPAddress(ipv6=True)]
+        _('Authorized IP'), [validators.Optional()]
     )
+    rights = fields.SelectField(
+            _('Rights'),
+            choices = [[c.name, c.name] for c in models.Token.Rights],
+            render_kw = {'class': 'btn-group-toggle'},
+    )
+
     submit = fields.SubmitField(_('Save'))
 
+    def validate_ip(form, field):
+        if not field.data:
+            return True
+        try:
+            for candidate in field.data.replace(' ','').split(','):
+                ipaddress.ip_network(candidate, False)
+        except:
+            raise validators.ValidationError('Not a valid list of CIDRs')
 
 class AliasForm(flask_wtf.FlaskForm):
     localpart = fields.StringField(_('Alias'), [validators.DataRequired(), validators.Regexp(LOCALPART_REGEX)])

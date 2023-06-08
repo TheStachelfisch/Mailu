@@ -1,0 +1,3 @@
+Changes to Tokens/app-passwords
+- Allow a list of subnets rather than just ip addresses
+- ability to restrict them to send/receive only
